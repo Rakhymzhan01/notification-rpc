@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package sis2;
+
+option java_multiple_files = true;
+option java_package = "sis2.proto";
+option java_outer_classname = "NotificationProto";
+
+// Notification Service - Ingest API step (SIS #1): accept one event, write to Kafka.
+// Idempotency key defaults to event_id in the body. It can be overridden explicitly via
+// gRPC metadata "idempotency-key" (REST: "Idempotency-Key" header).
+service NotificationService {
+  rpc PublishEvent(PublishEventRequest) returns (PublishEventResponse);
+}
+
+message PublishEventRequest {
+  string event_id = 1;   // producer-generated UUID; optional - server fills in a fresh UUID if blank
+  string user_id = 2;    // Kafka partition key (events are keyed by user_id in SIS #1)
+  string type = 3;       // "order.created", "user.signup", ...
+  string payload = 4;    // free-form text body, ~1 KB average, up to 10 KB (SIS #1)
+}
+
+message PublishEventResponse {
+  string event_id = 1;   // echoes the request event_id (or the server-generated one)
+  bool accepted = 2;     // true at the 202 semantics; errors come as gRPC status / HTTP 4xx-5xx
+  bool replayed = 3;     // true when the answer came from the idempotency store
+}
